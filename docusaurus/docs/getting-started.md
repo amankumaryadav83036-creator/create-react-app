@@ -1,162 +1,100 @@
----
-id: getting-started
-title: Getting Started
----
+// Darwaza-Khidki Estimator - Single-file React web app (App.jsx) // Usage: paste this into src/App.jsx of a Create React App or Vite React project. // No extra npm packages required. Uses localStorage for persistence.
 
-Create React App is an officially supported way to create single-page React
-applications. It offers a modern build setup with no configuration.
+import React, { useState, useEffect } from 'react';
 
-## Quick Start
+const STORAGE_KEY = '@quotes_list_v1_web';
 
-```sh
-npx create-react-app my-app
-cd my-app
-npm start
-```
+export default function App() { const [lang, setLang] = useState('hi'); // 'hi' or 'en' const [type, setType] = useState('darwaza'); const [height, setHeight] = useState(''); const [width, setWidth] = useState(''); const [rate, setRate] = useState('1500'); const [labour, setLabour] = useState('500'); const [quotes, setQuotes] = useState([]);
 
-> If you've previously installed `create-react-app` globally via `npm install -g create-react-app`, we recommend you uninstall the package using `npm uninstall -g create-react-app` or `yarn global remove create-react-app` to ensure that `npx` always uses the latest version.
+useEffect(() => { loadQuotes(); }, []);
 
-_([npx](https://medium.com/@maybekatz/introducing-npx-an-npm-package-runner-55f7d4bd282b) comes with npm 5.2+ and higher, see [instructions for older npm versions](https://gist.github.com/gaearon/4064d3c23a77c74a3614c498a8bb1c5f))_
+const loadQuotes = () => { try { const json = localStorage.getItem(STORAGE_KEY); if (json) setQuotes(JSON.parse(json)); } catch (e) { console.warn('Load failed', e); } };
 
-Then open [http://localhost:3000/](http://localhost:3000/) to see your app.
+const saveQuotes = (next) => { try { localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); setQuotes(next); } catch (e) { console.warn('Save failed', e); } };
 
-When you’re ready to deploy to production, create a minified bundle with `npm run build`.
+const parseNumber = (v) => { const n = Number(String(v).replace(/,/g, '')); return Number.isFinite(n) ? n : 0; };
 
-<p align='center'>
-<img src='https://cdn.jsdelivr.net/gh/facebook/create-react-app@27b42ac7efa018f2541153ab30d63180f5fa39e0/screencast.svg' width='600' alt='npm start' />
-</p>
+const estimate = () => { const h = parseNumber(height) / 100; // meters const w = parseNumber(width) / 100; // meters const area = h * w; const materialRate = parseNumber(rate); const material = Number((area * materialRate).toFixed(2)); const labourCost = parseNumber(labour); const gst = Number((0.18 * (material + labourCost)).toFixed(2)); const total = Number((material + labourCost + gst).toFixed(2));
 
-### Get Started Immediately
+return { area: Number(area.toFixed(3)), material, labour: labourCost, gst, total };
 
-You **don’t** need to install or configure tools like webpack or Babel. They are preconfigured and hidden so that you can focus on the code.
+};
 
-Create a project, and you’re good to go.
+const handleAddQuote = () => { if (!height || !width) { alert(lang === 'hi' ? 'ऊँचाई और चौड़ाई डालें' : 'Enter height and width'); return; } const est = estimate(); const item = { id: Date.now().toString(), type, height, width, rate, labour, ...est, createdAt: new Date().toISOString(), }; const next = [item, ...quotes]; saveQuotes(next); setHeight(''); setWidth(''); alert((lang === 'hi' ? 'अनुमान जोड़ा\n' : 'Estimate saved\n') + (lang==='hi'?'कुल: ':'Total: ') + '₹' + item.total); };
 
-## Creating an App
+const handleDelete = (id) => { if (!window.confirm(lang==='hi'?'क्या आप हटाना चाहते हैं?':'Delete this quote?')) return; const next = quotes.filter((q) => q.id !== id); saveQuotes(next); };
 
-**You’ll need to have Node >= 14 on your local development machine** (but it’s not required on the server). You can use [nvm](https://github.com/creationix/nvm#installation) (macOS/Linux) or [nvm-windows](https://github.com/coreybutler/nvm-windows#node-version-manager-nvm-for-windows) to switch Node versions between different projects.
+const handleShare = async (q) => { const text = ${lang==='hi'?'प्रकार':'Type'}: ${q.type}\n${lang==='hi'?'आकार':'Size'}: ${q.height}x${q.width} cm\n${lang==='hi'?'क्षेत्रफल':'Area'}: ${q.area} m²\n${lang==='hi'?'सामग्री':'Material'}: ₹${q.material}\n${lang==='hi'?'श्रम':'Labour'}: ₹${q.labour}\nGST: ₹${q.gst}\n${lang==='hi'?'कुल':'Total'}: ₹${q.total}; if (navigator.share) { try { await navigator.share({ title: lang==='hi'?'अनुमान शेयर करें':'Share estimate', text }); } catch (e) { console.warn('Share failed', e); } } else { // fallback: copy to clipboard try { await navigator.clipboard.writeText(text); alert(lang==='hi'?'टेक्स्ट क्लिपबोर्ड पर कॉपी हुआ':'Text copied to clipboard'); } catch (e) { // show text in a prompt as last resort window.prompt(lang==='hi'?'यहाँ कॉपी करें:':'Copy this text:', text); } } };
 
-To create a new app, you may choose one of the following methods:
+const clearAll = () => { if (!window.confirm(lang==='hi'?'सभी रिकॉर्ड हटाएँ?':'Remove all saved quotes?')) return; saveQuotes([]); };
 
-### npx
+const downloadCSV = () => { if (!quotes.length) { alert(lang==='hi'?'कोई रिकॉर्ड नहीं':'No records'); return; } const header = ['type','height_cm','width_cm','area_m2','material','labour','gst','total','createdAt']; const rows = quotes.map(q => [q.type,q.height,q.width,q.area,q.material,q.labour,q.gst,q.total,q.createdAt]); const csv = [header, ...rows].map(r => r.map(String).map(v=>"${v.replace(/"/g,'""')}").join(',')).join('\n'); const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = url; a.download = 'estimates.csv'; a.click(); URL.revokeObjectURL(url); };
 
-```sh
-npx create-react-app@latest my-app
-```
+const t = (h, e) => (lang === 'hi' ? h : e);
 
-_([npx](https://medium.com/@maybekatz/introducing-npx-an-npm-package-runner-55f7d4bd282b) comes with npm 5.2+ and higher, see [instructions for older npm versions](https://gist.github.com/gaearon/4064d3c23a77c74a3614c498a8bb1c5f))_
+return ( <div style={styles.app}> <div style={styles.card}> <div style={styles.header}> <h1 style={{margin:0}}>{t('दरवाज़ा/खिड़की अनुमान','Door/Window Estimator')}</h1> <div> <button style={styles.langBtn} onClick={() => setLang(lang==='hi'?'en':'hi')}>{lang==='hi'?'EN':'हिंदी'}</button> </div> </div>
 
-### npm
+<div style={styles.form}>
+      <label style={styles.label}>{t('प्रकार','Type')}</label>
+      <select value={type} onChange={e=>setType(e.target.value)} style={styles.select}>
+        <option value="darwaza">{t('दरवाज़ा','Door')}</option>
+        <option value="khidki">{t('खिड़की','Window')}</option>
+        <option value="sheesha">{t('शीशा','Glass')}</option>
+      </select>
 
-```sh
-npm init react-app my-app
-```
+      <div style={styles.row}>
+        <input placeholder={t('ऊँचाई (cm)','Height (cm)')} value={height} onChange={e=>setHeight(e.target.value)} style={styles.input} />
+        <input placeholder={t('चौड़ाई (cm)','Width (cm)')} value={width} onChange={e=>setWidth(e.target.value)} style={styles.input} />
+      </div>
 
-_`npm init <initializer>` is available in npm 6+_
+      <div style={styles.row}>
+        <input placeholder={t('सामग्री दर प्रति m²','Material rate per m²')} value={rate} onChange={e=>setRate(e.target.value)} style={styles.input} />
+        <input placeholder={t('श्रम (₹)','Labour (₹)')} value={labour} onChange={e=>setLabour(e.target.value)} style={styles.input} />
+      </div>
 
-### Yarn
+      <div style={{display:'flex',gap:8}}>
+        <button style={styles.primary} onClick={handleAddQuote}>{t('अनुमान जोड़ें','Save estimate')}</button>
+        <button style={styles.secondary} onClick={()=>alert(JSON.stringify(estimate()))}>{t('तुरंत देखें','Quick estimate')}</button>
+      </div>
+    </div>
 
-```sh
-yarn create react-app my-app
-```
+    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginTop:12}}>
+      <h3 style={{margin:0}}>{t('बचाए गए अनुमान','Saved estimates')}</h3>
+      <div style={{display:'flex',gap:8}}>
+        <button onClick={downloadCSV} style={{...styles.link}}>{t('डाउनलोड CSV','Download CSV')}</button>
+        <button onClick={clearAll} style={{...styles.link, color:'#ff4d4d'}}>{t('साफ़ करें','Clear')}</button>
+      </div>
+    </div>
 
-_`yarn create` is available in Yarn 0.25+_
+    <div style={{marginTop:10}}>
+      {quotes.length===0 ? (
+        <p style={{textAlign:'center',color:'#666'}}>{t('कोई रिकॉर्ड नहीं','No records yet')}</p>
+      ) : (
+        quotes.map(q => (
+          <div key={q.id} style={styles.rowCard}>
+            <div>
+              <div style={{fontWeight:700}}>{q.type} — {q.height} x {q.width} cm</div>
+              <div style={{color:'#666',fontSize:13}}>Area: {q.area} m² • Total: ₹{q.total}</div>
+              <div style={{color:'#999',fontSize:12}}>{new Date(q.createdAt).toLocaleString()}</div>
+            </div>
+            <div style={{display:'flex',flexDirection:'column',gap:6}}>
+              <button style={styles.smallBtn} onClick={()=>handleShare(q)}>{t('शेयर','Share')}</button>
+              <button style={{...styles.smallBtn,background:'#ff6b6b'}} onClick={()=>handleDelete(q.id)}>{t('हटाएँ','Delete')}</button>
+            </div>
+          </div>
+        ))
+      )}
+    </div>
 
-### Selecting a template
+    <div style={{textAlign:'center',marginTop:18,color:'#999'}}>Made with ❤️</div>
+  </div>
 
-You can now optionally start a new app from a template by appending `--template [template-name]` to the creation command.
+  {/* basic styles inlined so the file is self-contained */}
+  <style>{`body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial; background:#f5f7fb; }
+  `}</style>
+</div>
 
-If you don't select a template, we'll create your project with our base template.
+); }
 
-Templates are always named in the format `cra-template-[template-name]`, however you only need to provide the `[template-name]` to the creation command.
+const styles = { app: { padding: 16, minHeight:'100vh' }, card: { maxWidth:900, margin:'0 auto', background:'#fff', padding:16, borderRadius:10, boxShadow:'0 6px 18px rgba(0,0,0,0.06)' }, header: { display:'flex', justifyContent:'space-between', alignItems:'center' }, langBtn: { padding:'8px 10px', borderRadius:6, background:'#eee', border:'none', cursor:'pointer' }, form: { marginTop:12, background:'#fafafa', padding:12, borderRadius:8 }, label: { fontWeight:700, marginBottom:6, display:'block' }, select: { width:'100%', padding:8, borderRadius:6, border:'1px solid #ddd', marginBottom:8 }, row: { display:'flex', gap:8, marginBottom:8 }, input: { flex:1, padding:8, borderRadius:6, border:'1px solid #ddd' }, primary: { flex:1, padding:10, borderRadius:8, background:'#2b8aef', color:'#fff', border:'none', cursor:'pointer' }, secondary: { flex:1, padding:10, borderRadius:8, border:'1px solid #2b8aef', color:'#2b8aef', background:'transparent', cursor:'pointer' }, link: { background:'transparent', border:'none', cursor:'pointer', color:'#2b8aef', padding:6 }, rowCard: { display:'flex', justifyContent:'space-between', alignItems:'center', padding:10, borderRadius:8, background:'#fff', border:'1px solid #eee', marginTop:10 }, smallBtn: { padding:8, borderRadius:6, background:'#2b8aef', color:'#fff', border:'none', cursor:'pointer' } };
 
-```sh
-npx create-react-app my-app --template [template-name]
-```
-
-> You can find a list of available templates by searching for ["cra-template-\*"](https://www.npmjs.com/search?q=cra-template-*) on npm.
-
-Our [Custom Templates](custom-templates.md) documentation describes how you can build your own template.
-
-#### Creating a TypeScript app
-
-You can start a new TypeScript app using templates. To use our provided TypeScript template, append `--template typescript` to the creation command.
-
-```sh
-npx create-react-app my-app --template typescript
-```
-
-If you already have a project and would like to add TypeScript, see our [Adding TypeScript](adding-typescript.md) documentation.
-
-### Selecting a package manager
-
-When you create a new app, the CLI will use [npm](https://docs.npmjs.com) or [Yarn](https://yarnpkg.com/) to install dependencies, depending on which tool you use to run `create-react-app`. For example:
-
-```sh
-# Run this to use npm
-npx create-react-app my-app
-# Or run this to use yarn
-yarn create react-app my-app
-```
-
-## Output
-
-Running any of these commands will create a directory called `my-app` inside the current folder. Inside that directory, it will generate the initial project structure and install the transitive dependencies:
-
-```
-my-app
-├── README.md
-├── node_modules
-├── package.json
-├── .gitignore
-├── public
-│   ├── favicon.ico
-│   ├── index.html
-│   ├── logo192.png
-│   ├── logo512.png
-│   ├── manifest.json
-│   └── robots.txt
-└── src
-    ├── App.css
-    ├── App.js
-    ├── App.test.js
-    ├── index.css
-    ├── index.js
-    ├── logo.svg
-    ├── serviceWorker.js
-    └── setupTests.js
-```
-
-No configuration or complicated folder structures, only the files you need to build your app. Once the installation is done, you can open your project folder:
-
-```sh
-cd my-app
-```
-
-## Scripts
-
-Inside the newly created project, you can run some built-in commands:
-
-### `npm start` or `yarn start`
-
-Runs the app in development mode. Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
-
-The page will automatically reload if you make changes to the code. You will see the build errors and lint warnings in the console.
-
-<p align='center'>
-<img src='https://cdn.jsdelivr.net/gh/marionebl/create-react-app@9f6282671c54f0874afd37a72f6689727b562498/screencast-error.svg' width='600' alt='Build errors' />
-</p>
-
-### `npm test` or `yarn test`
-
-Runs the test watcher in an interactive mode. By default, runs tests related to files changed since the last commit.
-
-[Read more about testing](running-tests.md).
-
-### `npm run build` or `yarn build`
-
-Builds the app for production to the `build` folder. It correctly bundles React in production mode and optimizes the build for the best performance.
-
-The build is minified and the filenames include the hashes.
-
-Your app is ready to be deployed.
